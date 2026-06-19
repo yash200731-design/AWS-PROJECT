@@ -1,0 +1,6 @@
+{
+  "name": "Green Code Choice",
+  "description": "AI-powered cloud sustainability platform providing AWS carbon footprint, energy efficiency analysis, cost savings estimation, and regional emissions optimization dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
