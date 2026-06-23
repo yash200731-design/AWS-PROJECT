@@ -24,7 +24,7 @@ import {
   INITIAL_HISTORY, 
   INITIAL_SETTINGS 
 } from './data';
-import { AppSettings, CloudResource, AIRecommendation, AuditHistoryEntry } from './types';
+import { AppSettings, CloudResource, AIRecommendation, AuditHistoryEntry, TelemetryData, LiveEvent } from './types';
 
 export default function App() {
   // Navigation tabs state
@@ -37,6 +37,11 @@ export default function App() {
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>(INITIAL_RECOMMENDATIONS);
   const [history, setHistory] = useState<AuditHistoryEntry[]>(INITIAL_HISTORY);
   const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
+
+  // Real-time telemetry state
+  const [telemetryEnabled, setTelemetryEnabled] = useState<boolean>(true);
+  const [telemetryDataHistory, setTelemetryDataHistory] = useState<TelemetryData[]>([]);
+  const [liveEventsList, setLiveEventsList] = useState<LiveEvent[]>([]);
 
   // Visual feedback & Simulator status states
   const [darkMode, setDarkMode] = useState<boolean>(false); // Default to light mode for Geometric Balance
@@ -166,6 +171,77 @@ export default function App() {
 
     setToastMessage(`Executed Optimization: "${rec.title}" is now active in your AWS sandbox.`);
   };
+
+  // SSE Telemetry listener effect
+  useEffect(() => {
+    if (!telemetryEnabled) {
+      return;
+    }
+
+    const eventSource = new EventSource('/api/aws/telemetry');
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data: TelemetryData = JSON.parse(event.data);
+        
+        setTelemetryDataHistory(prev => {
+          const next = [...prev, data];
+          if (next.length > 20) {
+            next.shift();
+          }
+          return next;
+        });
+
+        if (data.liveEvent) {
+          setLiveEventsList(prev => {
+            const next = [data.liveEvent!, ...prev];
+            if (next.length > 50) {
+              next.pop();
+            }
+            return next;
+          });
+
+          // If autoOptimize is enabled and a warning comes in, apply optimization
+          if (settings.autoOptimize && data.liveEvent.type === 'warning') {
+            setRecommendations(prevRecs => {
+              const pending = prevRecs.filter(r => !r.applied);
+              if (pending.length > 0) {
+                // Select first pending recommendation to auto-apply
+                const recToApply = pending[0];
+                setTimeout(() => {
+                  handleApplyRecommendation(recToApply.id);
+                }, 100);
+              }
+              return prevRecs;
+            });
+          }
+        }
+
+        // Apply slight real-time fluctuations to non-optimized resources
+        setResources(prev => prev.map(res => {
+          if (res.status === 'optimized') return res;
+          const fluctuation = 0.985 + Math.random() * 0.03; // +/- 1.5%
+          return {
+            ...res,
+            energyUsageKwh: Math.round(res.energyUsageKwh * fluctuation * 10) / 10,
+            carbonEmissionKg: Math.round(res.carbonEmissionKg * fluctuation * 10) / 10,
+            monthlyCost: Math.round(res.monthlyCost * fluctuation * 100) / 100
+          };
+        }));
+
+      } catch (err) {
+        console.error("SSE stream JSON parsing failure:", err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.warn("SSE telemetry stream connection error, retrying...", err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [telemetryEnabled, settings.autoOptimize]);
 
   // Handler: Quick optimization from individual resource tables
   const handleApplyQuickOptimisation = (resourceId: string, reductionKg: number, savingsUsd: number) => {
@@ -322,6 +398,10 @@ export default function App() {
                     history={history}
                     applyRecommendation={handleApplyRecommendation}
                     setActiveTab={setActiveTab}
+                    telemetryEnabled={telemetryEnabled}
+                    setTelemetryEnabled={setTelemetryEnabled}
+                    telemetryDataHistory={telemetryDataHistory}
+                    liveEventsList={liveEventsList}
                   />
                 )}
                 

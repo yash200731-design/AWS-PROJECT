@@ -49,3 +49,25 @@ export interface AppSettings {
   preferredRegions: string[];
   autoOptimize: boolean;
 }
+
+export interface LiveEvent {
+  id: string;
+  timestamp: string;
+  message: string;
+  type: 'info' | 'warning' | 'optimization';
+  resourceId?: string;
+}
+
+export interface TelemetryData {
+  timestamp: string;
+  instantaneousPowerKw: number;
+  carbonEmissionRateGps: number;
+  activeWorkloads: {
+    ec2Cpu: number;
+    lambdaConcurrency: number;
+    rdsConnections: number;
+    s3ReadRate: number;
+  };
+  liveEvent?: LiveEvent;
+}
+

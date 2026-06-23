@@ -13,7 +13,7 @@ import {
   Zap,
   Globe
 } from 'lucide-react';
-import { CloudResource, AIRecommendation, AuditHistoryEntry } from '../types';
+import { CloudResource, AIRecommendation, AuditHistoryEntry, TelemetryData, LiveEvent } from '../types';
 
 interface DashboardProps {
   resources: CloudResource[];
@@ -21,6 +21,10 @@ interface DashboardProps {
   history: AuditHistoryEntry[];
   applyRecommendation: (id: string) => void;
   setActiveTab: (tab: string) => void;
+  telemetryEnabled: boolean;
+  setTelemetryEnabled: (enabled: boolean) => void;
+  telemetryDataHistory: TelemetryData[];
+  liveEventsList: LiveEvent[];
 }
 
 export default function Dashboard({
@@ -28,7 +32,11 @@ export default function Dashboard({
   recommendations,
   history,
   applyRecommendation,
-  setActiveTab
+  setActiveTab,
+  telemetryEnabled,
+  setTelemetryEnabled,
+  telemetryDataHistory,
+  liveEventsList
 }: DashboardProps) {
   
   // Local state for interactive chart hovers
@@ -153,6 +161,37 @@ export default function Dashboard({
   // Shadow path to fill standard gradient area beneath emission curve
   const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - paddingBottom} L ${points[0].x} ${height - paddingBottom} Z`;
 
+  // Real-time chart mapping (width 320, height 80)
+  const rtWidth = 320;
+  const rtHeight = 80;
+  const rtPaddingLeft = 5;
+  const rtPaddingRight = 5;
+  const rtPaddingTop = 10;
+  const rtPaddingBottom = 5;
+  const rtPlotWidth = rtWidth - rtPaddingLeft - rtPaddingRight;
+  const rtPlotHeight = rtHeight - rtPaddingTop - rtPaddingBottom;
+
+  const rtPoints = telemetryDataHistory.map((item, index) => {
+    const x = rtPaddingLeft + (index / Math.max(1, telemetryDataHistory.length - 1)) * rtPlotWidth;
+    const rates = telemetryDataHistory.map(d => d.carbonEmissionRateGps);
+    const maxRate = Math.max(...rates, 2);
+    const minRate = Math.min(...rates, 0.5);
+    const range = maxRate - minRate || 1;
+    const ratio = (item.carbonEmissionRateGps - minRate) / range;
+    const y = rtPaddingTop + rtPlotHeight - (ratio * rtPlotHeight);
+    return { x, y };
+  });
+
+  let rtLinePath = '';
+  let rtAreaPath = '';
+  if (rtPoints.length > 0) {
+    rtLinePath = `M ${rtPoints[0].x} ${rtPoints[0].y}`;
+    for (let i = 1; i < rtPoints.length; i++) {
+      rtLinePath += ` L ${rtPoints[i].x} ${rtPoints[i].y}`;
+    }
+    rtAreaPath = `${rtLinePath} L ${rtPoints[rtPoints.length - 1].x} ${rtHeight - rtPaddingBottom} L ${rtPoints[0].x} ${rtHeight - rtPaddingBottom} Z`;
+  }
+
   return (
     <div className="space-y-6">
       
@@ -175,6 +214,170 @@ export default function Dashboard({
             Scanning Active AWS Grid
           </span>
         </div>
+      </div>
+
+      {/* Real-time Telemetry Control Room Card */}
+      <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-3 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2.5 w-2.5 relative">
+              {telemetryEnabled ? (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </>
+              ) : (
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-450"></span>
+              )}
+            </span>
+            <h2 className="font-sans font-semibold text-md text-gray-900 dark:text-white flex items-center gap-1.5">
+              <span>Live Telemetry & Activity Feed</span>
+              {telemetryEnabled && (
+                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 font-mono font-bold px-2 py-0.5 rounded animate-pulse">
+                  Streaming
+                </span>
+              )}
+            </h2>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 dark:text-slate-450 font-sans">
+              SSE Connection
+            </span>
+            {/* Toggle Switch */}
+            <button
+              id="telemetry-connection-toggle-btn"
+              type="button"
+              onClick={() => setTelemetryEnabled(!telemetryEnabled)}
+              className={`w-9 h-5 rounded-full transition-colors relative focus:outline-none ${
+                telemetryEnabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-800'
+              }`}
+            >
+              <span 
+                className={`absolute top-0.5 left-0.5 bg-white h-4 w-4 rounded-full transition-transform ${
+                  telemetryEnabled ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {telemetryEnabled ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Live Stats Graph - 7 cols */}
+            <div className="lg:col-span-7 flex flex-col justify-between gap-4">
+              <div className="grid grid-cols-3 gap-3">
+                {/* Instantaneous Power */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-850">
+                  <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Live Power Load</div>
+                  <div className="text-lg font-extrabold text-slate-850 dark:text-white font-mono mt-1 flex items-baseline gap-1">
+                    <span>{telemetryDataHistory[telemetryDataHistory.length - 1]?.instantaneousPowerKw || '0.00'}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">kW</span>
+                  </div>
+                </div>
+                
+                {/* Instantaneous Carbon */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-850">
+                  <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Carbon flow rate</div>
+                  <div className="text-lg font-extrabold text-emerald-605 dark:text-emerald-400 font-mono mt-1 flex items-baseline gap-1">
+                    <span>{telemetryDataHistory[telemetryDataHistory.length - 1]?.carbonEmissionRateGps || '0.00'}</span>
+                    <span className="text-[10px] text-emerald-500/75 font-normal">g/s</span>
+                  </div>
+                </div>
+
+                {/* active workloads summary */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-850">
+                  <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">active query load</div>
+                  <div className="text-lg font-extrabold text-indigo-650 dark:text-indigo-400 font-mono mt-1 flex items-baseline gap-1">
+                    <span>{telemetryDataHistory[telemetryDataHistory.length - 1]?.activeWorkloads?.rdsConnections || '0'}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">reqs</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic scrolling graph */}
+              <div className="flex-1 min-h-[90px] p-2 bg-slate-950 rounded-xl border border-slate-850 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-2 left-3 z-10 flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900/50 font-mono">
+                    Real-time carbon rate (g CO₂e/sec)
+                  </span>
+                </div>
+                
+                <div className="w-full h-20 mt-4 select-none">
+                  {telemetryDataHistory.length > 0 ? (
+                    <svg className="w-full h-full text-emerald-500/30 overflow-visible" viewBox={`0 0 ${rtWidth} ${rtHeight}`} preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="rtChartGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      {rtAreaPath && <path d={rtAreaPath} fill="url(#rtChartGradient)" className="transition-all duration-300" />}
+                      {rtLinePath && <path d={rtLinePath} fill="none" stroke="#10b981" strokeWidth={2} strokeLinecap="round" className="transition-all duration-300" />}
+                      
+                      {/* Pulse point at the end */}
+                      {rtPoints.length > 0 && (
+                        <circle 
+                          cx={rtPoints[rtPoints.length - 1].x} 
+                          cy={rtPoints[rtPoints.length - 1].y} 
+                          r={3.5} 
+                          fill="#10b981" 
+                          className="animate-pulse"
+                        />
+                      )}
+                    </svg>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-[10px] text-slate-500 italic">
+                      Populating real-time buffer...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Live Events Stream - 5 cols */}
+            <div className="lg:col-span-5 flex flex-col justify-between gap-2.5">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                Telemetry Log Stream
+              </div>
+              <div className="h-[148px] overflow-y-auto font-mono text-[9.5px] bg-slate-950 text-slate-300 p-3 rounded-xl border border-slate-800 space-y-1.5 text-left scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                {liveEventsList.length === 0 ? (
+                  <div className="text-slate-500 italic text-center pt-14">Awaiting telemetry logs...</div>
+                ) : (
+                  liveEventsList.map((evt) => {
+                    const timeStr = new Date(evt.timestamp).toLocaleTimeString();
+                    const colorClass = 
+                      evt.type === 'warning' 
+                        ? 'text-rose-400 font-bold' 
+                        : evt.type === 'optimization' 
+                        ? 'text-emerald-400 font-bold' 
+                        : 'text-slate-305';
+                    return (
+                      <div key={evt.id} className="flex gap-1.5 leading-relaxed">
+                        <span className="text-slate-500 shrink-0 font-sans">[{timeStr}]</span>
+                        <span className={`${colorClass}`}>{evt.message}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-8 flex flex-col items-center justify-center text-center bg-slate-50 dark:bg-slate-950/20 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+            <Activity className="w-8 h-8 text-slate-400 animate-pulse mb-2" />
+            <p className="text-xs text-gray-500 dark:text-slate-400 font-sans font-medium">
+              Telemetry Server Stream is currently disconnected.
+            </p>
+            <button
+              id="activate-telemetry-panel-btn"
+              onClick={() => setTelemetryEnabled(true)}
+              className="mt-3 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10.5px] font-bold shadow-sm transition-all"
+            >
+              Initialize SSE Stream
+            </button>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards Grid */}

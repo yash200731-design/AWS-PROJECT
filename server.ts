@@ -453,6 +453,80 @@ async function startServer() {
       });
     }
   });
+  // ----------------------------------------------------
+  // CORE API ROUTE: Live telemetry streaming via SSE
+  // ----------------------------------------------------
+  app.get("/api/aws/telemetry", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    console.log("Telemetry client connected to SSE stream");
+
+    const liveEventsPool = [
+      { message: "EC2 cluster CPU usage fluctuated to 28% in us-east-1", type: "info" as const },
+      { message: "RDS Postgres database connection pool synchronized", type: "info" as const },
+      { message: "Spike in S3 Object read operations detected in analytics bucket", type: "info" as const },
+      { message: "Lambda billing optimization: execution duration under budget", type: "optimization" as const },
+      { message: "Idle Warning: EC2 dev-sandbox-bastion is currently running at 0% workload", type: "warning" as const },
+      { message: "Lambda concurrency peak of 45 executions recorded successfully", type: "info" as const },
+      { message: "RDS postgres database CPU usage under 12%. Under-utilized warning.", type: "warning" as const },
+      { message: "Intelligent-Tiering: 120 GB of stale logs transitioned to Glacier Deep Archive", type: "optimization" as const },
+      { message: "Automated schedule: Spot instance ml-inference shifted to off-peak grid window", type: "optimization" as const },
+      { message: "IAM credentials validated: Read-Only synchronization probe succeeded", type: "info" as const },
+      { message: "Provisioned warm concurrency on invoice-pdf-generator exceeds current demand", type: "warning" as const },
+      { message: "Active nodes in prod-api-cluster migrated to greener us-west-2 region", type: "optimization" as const }
+    ];
+
+    const sendTelemetry = () => {
+      const fluctuation = () => (0.95 + Math.random() * 0.1);
+      
+      const powerDraw = Math.round((12.5 * fluctuation()) * 100) / 100;
+      const carbonRate = Math.round((1.48 * fluctuation()) * 100) / 100;
+      
+      const ec2Cpu = Math.round(20 + Math.random() * 30);
+      const lambdaConcurrency = Math.round(5 + Math.random() * 25);
+      const rdsConnections = Math.round(30 + Math.random() * 20);
+      const s3ReadRate = Math.round(80 + Math.random() * 100);
+
+      let liveEvent = undefined;
+      if (Math.random() > 0.3) {
+        const randomItem = liveEventsPool[Math.floor(Math.random() * liveEventsPool.length)];
+        liveEvent = {
+          id: `evt-${Math.random().toString(36).substring(2, 11)}`,
+          timestamp: new Date().toISOString(),
+          message: randomItem.message,
+          type: randomItem.type
+        };
+      }
+
+      const data = {
+        timestamp: new Date().toISOString(),
+        instantaneousPowerKw: powerDraw,
+        carbonEmissionRateGps: carbonRate,
+        activeWorkloads: {
+          ec2Cpu,
+          lambdaConcurrency,
+          rdsConnections,
+          s3ReadRate
+        },
+        liveEvent
+      };
+
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    sendTelemetry();
+
+    const telemetryInterval = setInterval(sendTelemetry, 1500);
+
+    req.on("close", () => {
+      console.log("Telemetry client disconnected from SSE stream");
+      clearInterval(telemetryInterval);
+      res.end();
+    });
+  });
 
   // Serve frontend assets
   if (process.env.NODE_ENV !== "production") {
