@@ -43,8 +43,12 @@ export default function App() {
   const [telemetryDataHistory, setTelemetryDataHistory] = useState<TelemetryData[]>([]);
   const [liveEventsList, setLiveEventsList] = useState<LiveEvent[]>([]);
 
+  // AWS Sustainability Interactive States
+  const [workloadsShifted, setWorkloadsShifted] = useState<boolean>(false);
+  const [archMigrated, setArchMigrated] = useState<boolean>(false);
+
   // Visual feedback & Simulator status states
-  const [darkMode, setDarkMode] = useState<boolean>(false); // Default to light mode for Geometric Balance
+  const [darkMode, setDarkMode] = useState<boolean>(true); // Default to dark mode for AWS-style Sustainability Control Room
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [globalLoading, setGlobalLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -271,6 +275,66 @@ export default function App() {
     setToastMessage('Resource optimized successfully. Calculated footprint parameters decremented.');
   };
 
+  // Handler: Toggle workload scheduling alignment
+  const handleToggleWorkloadShifting = () => {
+    const nextState = !workloadsShifted;
+    setWorkloadsShifted(nextState);
+    if (nextState) {
+      setResources(prev => prev.map(res => {
+        if (res.id === 'i-0mm55nn66oo77pp88') {
+          return {
+            ...res,
+            carbonEmissionKg: Math.round(res.carbonEmissionKg * 0.3 * 10) / 10,
+            energyUsageKwh: Math.round(res.energyUsageKwh * 0.7 * 10) / 10,
+            status: 'optimized' as const,
+            suggestion: undefined
+          };
+        }
+        return res;
+      }));
+      setToastMessage('Workload Shifting Active: Shifted stateless batch workloads to green energy windows.');
+    } else {
+      setResources(prev => prev.map(res => {
+        if (res.id === 'i-0mm55nn66oo77pp88') {
+          const initRes = INITIAL_RESOURCES.find(r => r.id === 'i-0mm55nn66oo77pp88')!;
+          return { ...initRes };
+        }
+        return res;
+      }));
+      setToastMessage('Workload Shifting Inactive: Workloads restored to default schedule.');
+    }
+  };
+
+  // Handler: Toggle architecture migration
+  const handleToggleArchMigration = () => {
+    const nextState = !archMigrated;
+    setArchMigrated(nextState);
+    if (nextState) {
+      setResources(prev => prev.map(res => {
+        if (res.region === 'us-east-1') {
+          return {
+            ...res,
+            region: 'us-west-2',
+            carbonEmissionKg: Math.round(res.carbonEmissionKg * 0.3 * 10) / 10,
+            status: 'optimized' as const,
+            suggestion: undefined
+          };
+        }
+        return res;
+      }));
+      setToastMessage('Architecture Relocated: Non-critical services migrated to green Oregon (us-west-2) grid.');
+    } else {
+      setResources(prev => prev.map(res => {
+        const initRes = INITIAL_RESOURCES.find(r => r.id === res.id);
+        if (initRes && initRes.region === 'us-east-1') {
+          return { ...initRes };
+        }
+        return res;
+      }));
+      setToastMessage('Architecture Restored: Services relocated back to N. Virginia (us-east-1).');
+    }
+  };
+
   // Diagnostics: simulated global skeletons
   const handleTriggerSimulatedLoading = () => {
     setGlobalLoading(true);
@@ -402,6 +466,10 @@ export default function App() {
                     setTelemetryEnabled={setTelemetryEnabled}
                     telemetryDataHistory={telemetryDataHistory}
                     liveEventsList={liveEventsList}
+                    workloadsShifted={workloadsShifted}
+                    toggleWorkloadShifting={handleToggleWorkloadShifting}
+                    archMigrated={archMigrated}
+                    toggleArchMigration={handleToggleArchMigration}
                   />
                 )}
                 
