@@ -49,15 +49,33 @@ export default function AIRecommendations({ recommendations, applyRecommendation
   }, [recommendations]);
 
   // Handle Simulated Co-Pilot Prompts
-  const handleAiAssistantSubmit = (e: React.FormEvent) => {
+  const handleAiAssistantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiAssistantPrompt.trim()) return;
 
     setAiLoading(true);
     setAiResponse(null);
 
-    // Dynamic simulate response
-    setTimeout(() => {
+    // Call the server API endpoint which hooks into OpenAI
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: aiAssistantPrompt }),
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+
+      const data = await res.json();
+      setAiResponse(data.response);
+    } catch (error) {
+      console.warn("AI Copilot fetch failed, using frontend fallback simulation:", error);
+      
+      // Dynamic simulate response fallback
       const promptLower = aiAssistantPrompt.toLowerCase();
       let response = '';
 
@@ -70,10 +88,10 @@ export default function AIRecommendations({ recommendations, applyRecommendation
       } else {
         response = `### 🌱 Cloud Sustainability Consultation\n\nAnalyzing active cluster metrics for account \`4832-9011-3329\`. Here are prime recommendations:\n\n1. **Region Relocation:** Ensure EC2 nodes are configured inside standard green regions (Sweden, France, Oregon).\n2. **Right-sizing:** Convert over-provisioned db instances down. Current instances have idle overhead margins of **78%**.\n3. **Spot Instances:** Shift stateless batch jobs from On-Demand instances to Spot instances to automatically take advantage of excess grid power.\n\n*Try asking a specific query like "storage lifecycle" or "find idle compute" for highly granular execution details.*`;
       }
-
       setAiResponse(response);
+    } finally {
       setAiLoading(false);
-    }, 1200);
+    }
   };
 
   return (
