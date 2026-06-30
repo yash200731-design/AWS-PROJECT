@@ -598,7 +598,7 @@ Use clean Markdown formatting. Highlight key actions, estimated carbon reduction
       response: aiText
     });
 
-  } catch (err: any) {
+    } catch (err: any) {
     console.error("Failed to fetch OpenAI completion:", err);
     return res.json({
       source: "mock-fallback",
@@ -607,15 +607,26 @@ Use clean Markdown formatting. Highlight key actions, estimated carbon reduction
     });
   }
 });
-  } catch (err: any) {
-    console.error("Failed to fetch OpenAI completion:", err);
-    return res.json({
-      source: "mock-fallback",
-      response: getMockCopilotResponse(prompt),
-      warning: `Connection failed: ${err.message || err}. Fell back to simulation.`
-    });
-  }
+
+// ----------------------------------------------------
+// AWS SUMMARY API
+// ----------------------------------------------------
+app.get("/api/aws/summary", (req, res) => {
+  const summary = {
+    totalResources: 10,
+    totalEC2: 4,
+    totalS3: 2,
+    totalRDS: 2,
+    totalLambda: 2,
+    monthlyCost: 3611.5,
+    totalCarbonEmission: 5212.3,
+    sustainabilityScore: 87
+  };
+
+  res.json(summary);
 });
+
+export default app;
 
 export default app;
 export default app;
