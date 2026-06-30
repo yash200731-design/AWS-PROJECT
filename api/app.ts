@@ -607,5 +607,15 @@ Use clean Markdown formatting. Highlight key actions, estimated carbon reduction
     });
   }
 });
+  } catch (err: any) {
+    console.error("Failed to fetch OpenAI completion:", err);
+    return res.json({
+      source: "mock-fallback",
+      response: getMockCopilotResponse(prompt),
+      warning: `Connection failed: ${err.message || err}. Fell back to simulation.`
+    });
+  }
+});
 
+export default app;
 export default app;
