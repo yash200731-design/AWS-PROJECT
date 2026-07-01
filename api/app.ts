@@ -630,7 +630,5 @@ app.get("/api/hello",(req,res)=<{
     message:"Hello yash! My first Api is working"
     });
 });
-export default app;
 
-export default app;
 export default app;
