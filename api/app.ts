@@ -630,5 +630,5 @@ app.get("/api/hello",(req,res)=<{
     message:"Hello yash! My first Api is working"
     });
 });
-
+console.log("API /api/hello route loaded");
 export default app;
