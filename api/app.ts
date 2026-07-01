@@ -625,7 +625,11 @@ app.get("/api/aws/summary", (req, res) => {
 
   res.json(summary);
 });
-
+app.get("/api/hello",(req,res)=<{
+  res.json({
+    message:"Hello yash! My first Api is working"
+    });
+});
 export default app;
 
 export default app;
